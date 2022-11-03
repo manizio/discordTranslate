@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, isJSONEncodable } = require("discord.js");
+const { SlashCommandBuilder, isJSONEncodable, Embed, EmbedBuilder } = require("discord.js");
 const translate = require("@iamtraction/google-translate");
 
 module.exports = {
@@ -34,13 +34,28 @@ module.exports = {
     const src = interaction.options.getString("source");
     const tgt = interaction.options.getString("target");
     const txt = interaction.options.getString("text");
-    const count = parseInt(interaction.options.getString("count")) ?? 10;
+    const count = parseInt(interaction.options.getString("count")) ?? 1;
 
     await interaction.deferReply();
-    const translated = await hyperTranslate(src, tgt, txt, count);
-    await interaction.editReply(
-      `Original input: ${txt}\nTranslated input: ${translated}`
-    );
+    try{
+        const translated = await hyperTranslate(src, tgt, txt, count);
+        const embed = new EmbedBuilder()
+        .setColor(0x4b8bf5)
+        .setTitle(`:white_check_mark: Translated!`)
+        .setThumbnail('https://i.imgur.com/cC0XqRi.png')
+        .setDescription(`**${translated.text}**`)
+        .addFields(
+            {
+                name:'Original Input', value:`${txt}`
+            }
+        )
+        .setFooter({text: `Path: ${translated.path}`})
+        await interaction.editReply({embeds: [embed]});
+
+    } catch(e){
+        await interaction.editReply('**Something went wrong! Please verify your inputs and make sure the language is on the ISO-639-1 format. [see here](https://cloud.google.com/translate/docs/languages) **')
+    }
+    
   },
 };
 
@@ -144,6 +159,13 @@ var supportedLangs = [
   "zu",
 ]; //from HyperTranslate
 
+function keyExists (src, tgt){
+    if (!(src in supportedLangs)) {return false}
+    else if (!(tgt in supportedLangs)) {return false}
+    else{return true}
+
+}
+
 async function hyperTranslate(src, tgt, text, count) {
   let progress = 0;
   let langProgress;
@@ -153,25 +175,29 @@ async function hyperTranslate(src, tgt, text, count) {
 
   currentLang = src;
 
-  langProgress = `${currentLang} -> ${currentTgt} `;
+  langProgress = `${currentLang} `;
 
-  while (progress < count) {
+  while (progress < count -2) {
+    
     let res = await translate(transText, { from: currentLang, to: currentTgt });
 
     transText = res.text;
 
     currentLang = currentTgt;
 
+    langProgress += `-> ${currentTgt} `
     currentTgt = supportedLangs[random(supportedLangs)];
-
-    langProgress += `-> ${currentTgt} `;
     progress++;
   }
   let res = await translate(transText, { from: currentLang, to: tgt });
   langProgress += `-> ${tgt}`;
   transText = res.text;
 
-  return transText;
+  const translation = {
+    text: transText,
+    path: langProgress
+  }
+  return translation;
 }
 
 

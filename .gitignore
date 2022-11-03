@@ -90,3 +90,6 @@ Thumbs.db
 commands/user.js
 commands/server.js
 translation.js
+testing/server.js
+testing/test.js
+testing/user.js
