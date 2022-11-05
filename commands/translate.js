@@ -1,5 +1,7 @@
 const { SlashCommandBuilder, isJSONEncodable, Embed, EmbedBuilder } = require("discord.js");
 const translate = require("@iamtraction/google-translate");
+const progressBar = require('string-progressbar')
+const truncate = require('smart-truncate')
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -22,39 +24,46 @@ module.exports = {
         .setName("text")
         .setDescription("Text to be translated")
         .setRequired(true)
+        .setMaxLength(220)
     )
-    .addStringOption((op) =>
+    .addIntegerOption((op) =>
       op
         .setName("count")
         .setDescription(
-          "How many times the input will be translated DEFAULT: 100"
+          "How many times the input will be translated"
         )
+        .setRequired(true)
     ),
   async execute(interaction) {
+
     const src = interaction.options.getString("source");
     const tgt = interaction.options.getString("target");
     const txt = interaction.options.getString("text");
-    const count = parseInt(interaction.options.getString("count")) ?? 1;
+    const count = interaction.options.getInteger('count');
+
+    let embed = new EmbedBuilder()
 
     await interaction.deferReply();
     try{
-        const translated = await hyperTranslate(src, tgt, txt, count);
-        const embed = new EmbedBuilder()
-        .setColor(0x4b8bf5)
+        const translated = await hyperTranslate(embed, interaction, src, tgt, txt, count);
+        embed.setColor(0x4b8bf5)
         .setTitle(`:white_check_mark: Translated!`)
         .setThumbnail('https://i.imgur.com/cC0XqRi.png')
         .setDescription(`**${translated.text}**`)
         .addFields(
-            {
-                name:'Original Input', value:`${txt}`
-            }
-        )
-        .setFooter({text: `Path: ${translated.path}`})
+              {
+                  name:'Original Input', value:`${txt}`
+              }
+          )
+
+        let path = (count >= 150) ? truncate(translated.path, 20, {position: 12}) : translated.path
+        embed.setFooter({text: `Path: ${path}`})
         await interaction.editReply({embeds: [embed]});
 
     } catch(e){
         await interaction.editReply('**Something went wrong! Please verify your inputs and make sure the language is on the ISO-639-1 format. [see here](https://cloud.google.com/translate/docs/languages) **')
-    }
+        console.warn(e)
+      }
     
   },
 };
@@ -159,14 +168,8 @@ var supportedLangs = [
   "zu",
 ]; //from HyperTranslate
 
-function keyExists (src, tgt){
-    if (!(src in supportedLangs)) {return false}
-    else if (!(tgt in supportedLangs)) {return false}
-    else{return true}
-
-}
-
-async function hyperTranslate(src, tgt, text, count) {
+async function hyperTranslate(embed, interaction, src, tgt, text, count) {
+  
   let progress = 0;
   let langProgress;
   let currentLang;
@@ -177,17 +180,28 @@ async function hyperTranslate(src, tgt, text, count) {
 
   langProgress = `${currentLang} `;
 
+  embed
+        .setColor(0x4b8bf5)
+        .setTitle(`Translating... :hourglass_flowing_sand:`)
+        .setThumbnail('https://i.imgur.com/cC0XqRi.png')
+
   while (progress < count -2) {
     
     let res = await translate(transText, { from: currentLang, to: currentTgt });
 
     transText = res.text;
+    //console.log(transText)
 
     currentLang = currentTgt;
 
     langProgress += `-> ${currentTgt} `
     currentTgt = supportedLangs[random(supportedLangs)];
     progress++;
+    const bar = progressBar.filledBar(count, progress+2)
+    embed.setDescription(`${bar[0]}`)
+    embed.setFooter({text: `Progress: ${Math.round(bar[1])}%`})
+    interaction.editReply({embeds:[embed]})
+    
   }
   let res = await translate(transText, { from: currentLang, to: tgt });
   langProgress += `-> ${tgt}`;
@@ -195,7 +209,7 @@ async function hyperTranslate(src, tgt, text, count) {
 
   const translation = {
     text: transText,
-    path: langProgress
+    path: `${langProgress}`
   }
   return translation;
 }
