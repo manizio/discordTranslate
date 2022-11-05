@@ -197,7 +197,7 @@ async function hyperTranslate(embed, interaction, src, tgt, text, count) {
     langProgress += `-> ${currentTgt} `
     currentTgt = supportedLangs[random(supportedLangs)];
     progress++;
-    const bar = progressBar.filledBar(count, progress+2)
+    const bar = progressBar.filledBar(count, progress+2, size = 20, line = '⬜', slider = '🟩')
     embed.setDescription(`${bar[0]}`)
     embed.setFooter({text: `Progress: ${Math.round(bar[1])}%`})
     interaction.editReply({embeds:[embed]})
